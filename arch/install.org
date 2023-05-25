@@ -1,0 +1,139 @@
+#+title: Archlinux Bootstrap
+#+PROPERTY: header-args :tangle archstrap
+* Table of content :toc:
+- [[#about-this-script][About This Script]]
+- [[#settings][Settings]]
+- [[#partitioning][Partitioning]]
+- [[#base-install][Base Install]]
+- [[#getting-ready-for-chroot][Getting Ready For Chroot]]
+- [[#post-chroot][Post Chroot]]
+  - [[#locale][Locale]]
+  - [[#grub][GRUB]]
+  - [[#sudodoas-and-otherpackages][Sudo,doas and otherpackages]]
+  - [[#getting-ready-for-dots][Getting Ready For Dots]]
+  - [[#installing-dots][Installing Dots]]
+
+* About This Script
+This Script is created for automating the deployment of archlinux virtual machine or on physical hardware with all of my dotfiles setup
+NOTE:- This Script is for my use only
+* Settings
+#+begin_src bash
+#!/usr/bin/bash
+if [ "$EUID" -ne 0 ]
+  then echo "Please run as root"
+  exit
+fi
+
+echo "Welcome to archlinux bootstrap script"
+echo "Enter Your Name :-"
+read username
+echo "Enter Your User's Password :-"
+read userpass
+echo "Enter Hostname :-"
+read hostname
+echo "Is Virtual Machine ????"
+read isvirt
+#+end_src
+* Partitioning
+#+begin_src bash
+lsblk
+echo "Select Your Drive"
+read drive
+cfdisk $drive
+echo "Enter Root Partition Name"
+read rpart
+echo "Enter Boot Partition Name"
+read bpart
+
+mkfs.ext4 $rpart || exit 1
+mkfs.vfat -F32 $bpart || exit 1
+mount $rpart /mnt
+mount --mkdir $bpart /mnt/boot/efi
+#+end_src
+* Base Install
+#+BEGIN_SRC bash
+sed -i "s/^#ParallelDownloads = 5$/ParallelDownloads = 16/" /etc/pacman.conf
+timedatectl set-ntp true
+pacstrap /mnt/ base  base-devel linux linux-firmware sudo || exit 1
+genfstab -U /mnt/ >> /mnt/etc/fstab
+
+#+END_SRC
+* Getting Ready For Chroot
+#+BEGIN_SRC bash
+echo "username=$username" >> /mnt/installconfig
+echo "hostname=$hostname" >> /mnt/installconfig
+echo "isvirt=$isvirt" >> /mnt/installconfig
+echo "userpass=$userpass" >> /mnt/installconfig
+sed '1,/^#inchroot$/d' `basename $0` > /mnt/inchroot.sh
+chmod +x /mnt/inchroot.sh
+arch-chroot /mnt ./inchroot.sh || exit 1
+exit
+#inchroot
+#+END_SRC
+* Post Chroot
+** Locale
+#+begin_src bash
+printf '\033c'
+hostname=$(grep "^hostname" /installconfig | cut -d "=" -f2)
+username=$(grep "^username" /installconfig | cut -d "=" -f2)
+isvirt=$(grep "^isvirt" /installconfig | cut -d "=" -f2)
+userpass=$(grep "^userpass" /installconfig | cut -d "=" -f2)
+rm /installconfig
+sed -i "s/^#ParallelDownloads = 5$/ParallelDownloads = 16/" /etc/pacman.conf
+ln -sf /usr/share/zoneinfo/Asia/Kolkata /etc/localtime
+hwclock --systohc
+echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+locale-gen
+echo "LANG=en_US.UTF-8" > /etc/locale.conf
+echo "KEYMAP=us" > /etc/vconsole.conf
+echo $hostname > /etc/hostname
+echo "127.0.0.1       localhost" >> /etc/hosts
+echo "::1             localhost" >> /etc/hosts
+echo "127.0.1.1       $hostname.localdomain $hostname" >> /etc/hosts
+#+end_src
+** GRUB
+#+begin_src bash
+pacman --noconfirm -S grub efibootmgr os-prober
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB || exit 1
+grub-mkconfig -o /boot/grub/grub.cfg || exit 1
+#+end_src
+** Sudo,doas and otherpackages
+#+begin_src bash
+pacman -S --noconfirm xorg noto-fonts noto-fonts-emoji noto-fonts-cjk \
+       ttf-jetbrains-mono ttf-jetbrains-mono-nerd ttf-ubuntu-nerd \
+       ttf-font-awesome xdotool sxiv fzf man-db \
+       xwallpaper git pipewire pipewire-pulse networkmanager \
+       pamixer fish neovim vim opendoas \
+       lxdm stow xmonad xmonad-contrib \
+       xmobar xmonad-extras kitty exa neofetch btop
+case $isvirt in
+    no) pacman -S --noconfirm zathura zathura-pdf-mupdf unzip zip \
+               dosfstools ntfs-3g bluez bluez-utils mpd mpv ncmpcpp mpc\
+               emacs-nativecomp flameshot ;;
+esac
+systemctl enable NetworkManager
+systemctl enable lxdm
+
+echo "%wheel ALL=(ALL:ALL) ALL" >> /etc/sudoers
+echo "permit nopass :wheel as root" >> /etc/doas.conf
+useradd -mG wheel $username
+printf '%s\n%s\n' "$userpass" "$userpass" | passwd root;
+printf '%s\n%s\n' "$userpass" "$userpass" | passwd $username;
+#+end_src
+** Getting Ready For Dots
+#+begin_src bash
+dots_path=/home/$username/installdots
+sed '1,/^#dotssetup$/d' /inchroot.sh > $dots_path
+chown $username:$username $dots_path
+chmod +x $dots_path
+su -c $dots_path -s /bin/sh $username
+exit
+#dotssetup$$
+#+end_src
+** Installing Dots
+#+begin_src bash
+printf '\033c'
+cd $HOME
+git clone https://github.com/Sigma-Coder777/dots.git ~/.dots
+cd .dots && stow */ --adopt
+#+end_src
