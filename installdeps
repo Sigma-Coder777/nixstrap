@@ -1,0 +1,2 @@
+#!/bin/bash
+pacman -Sy --noconfirm dosfstools arch-install-scripts wget curl

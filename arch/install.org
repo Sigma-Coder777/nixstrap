@@ -28,7 +28,7 @@ echo "Welcome to archlinux bootstrap script"
 echo "Enter Your Name :-"
 read username
 echo "Enter Your User's Password :-"
-read userpass
+read -s userpass
 echo "Enter Hostname :-"
 read hostname
 echo "Is Virtual Machine ????"
@@ -93,12 +93,16 @@ echo "127.0.1.1       $hostname.localdomain $hostname" >> /etc/hosts
 #+end_src
 ** GRUB
 #+begin_src bash
+
+printf '\033c'
 pacman --noconfirm -S grub efibootmgr os-prober
 grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB || exit 1
 grub-mkconfig -o /boot/grub/grub.cfg || exit 1
 #+end_src
 ** Sudo,doas and otherpackages
 #+begin_src bash
+
+printf '\033c'
 pacman -S --noconfirm xorg noto-fonts noto-fonts-emoji noto-fonts-cjk \
        ttf-jetbrains-mono ttf-jetbrains-mono-nerd ttf-ubuntu-nerd \
        ttf-font-awesome xdotool sxiv fzf man-db \
@@ -107,7 +111,7 @@ pacman -S --noconfirm xorg noto-fonts noto-fonts-emoji noto-fonts-cjk \
        lxdm stow xmonad xmonad-contrib \
        xmobar xmonad-extras kitty exa neofetch btop
 case $isvirt in
-    no) pacman -S --noconfirm zathura zathura-pdf-mupdf unzip zip \
+    no|n|N) pacman -S --noconfirm zathura zathura-pdf-mupdf unzip zip \
                dosfstools ntfs-3g bluez bluez-utils mpd mpv ncmpcpp mpc\
                emacs-nativecomp flameshot ;;
 esac

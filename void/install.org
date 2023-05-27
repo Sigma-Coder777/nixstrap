@@ -1,0 +1,207 @@
+#+title: VoidLinux Bootstrap
+#+PROPERTY: header-args :tangle voidstrap
+* Table of content :toc:
+- [[#about-this-script][About This Script]]
+- [[#settings][Settings]]
+- [[#partitioning][Partitioning]]
+- [[#install-xbps][Install XBPS]]
+- [[#base-install][Base Install]]
+- [[#getting-ready-for-chroot][Getting Ready For Chroot]]
+- [[#post-chroot][Post Chroot]]
+  - [[#locale][Locale]]
+  - [[#grub][GRUB]]
+  - [[#sudodoas-and-otherpackages][Sudo,doas and otherpackages]]
+  - [[#getting-ready-for-dots][Getting Ready For Dots]]
+  - [[#installing-dots][Installing Dots]]
+
+* About This Script
+This Script is created for automating the deployment of archlinux virtual machine or on physical hardware with all of my dotfiles setup
+NOTE:- This Script is for my use only
+* Settings
+#+begin_src bash
+#!/usr/bin/bash
+if [ "$EUID" -ne 0 ]
+  then echo "Please run as root"
+  exit 1
+fi
+
+echo "Welcome to Voidlinux bootstrap script"
+echo "Enter Your Name :-"
+read username
+echo "Enter Your User's Password :-"
+read -s userpass
+echo "Enter Hostname :-"
+read hostname
+echo "Is Virtual Machine ????"
+read isvirt
+#+end_src
+* Partitioning
+#+begin_src bash
+lsblk
+echo "Select Your Drive"
+read drive
+cfdisk $drive
+echo "Enter Root Partition Name"
+read rpart
+echo "Enter Boot Partition Name"
+read bpart
+
+mkfs.ext4 $rpart || exit 1
+mkfs.vfat -F32 $bpart || exit 1
+mount $rpart /mnt
+mount --mkdir $bpart /mnt/boot/efi
+#+end_src
+* Install XBPS
+#+begin_src bash
+
+function installxbps {
+ wget http://repo-default.voidlinux.org/static/xbps-static-latest.x86_64-musl.tar.xz
+ mkdir /XBPS || exit 1
+ tar xvf xbps-static-latest.x86_64-musl.tar.xz -C /XBPS
+ export PATH=/XBPS/usr/bin:$PATH
+}
+command -v xbps-install || installxbps && isxbps=n
+#+end_src
+* Base Install
+#+BEGIN_SRC bash
+REPO=https://mirrors.dotsrc.org/voidlinux/current
+ARCH=x86_64
+mkdir -p /mnt/var/db/xbps/keys
+case isxbps in
+    n) cp /XBPS/var/db/xbps/keys/* /mnt/var/db/xbps/keys/ ;;
+    *) cp /var/db/xbps/keys/* /mnt/var/db/xbps/keys/ ||  cp /XBPS/var/db/xbps/keys/* /mnt/var/db/xbps/keys/ ;;
+esac
+cp /XBPS/var/db/xbps/keys/* /mnt/var/db/xbps/keys/
+XBPS_ARCH=$ARCH xbps-install -Sy -r /mnt -R "$REPO" base-system linux || exit 1
+genfstab -U /mnt/ > /mnt/etc/fstab
+
+#+END_SRC
+* Getting Ready For Chroot
+#+BEGIN_SRC bash
+echo "username=$username" >> /mnt/installconfig
+echo "hostname=$hostname" >> /mnt/installconfig
+echo "isvirt=$isvirt" >> /mnt/installconfig
+echo "userpass=$userpass" >> /mnt/installconfig
+echo "REPO=$REPO" >> /mnt/installconfig
+sed '1,/^#inchroot$/d' `basename $0` > /mnt/inchroot.sh
+chmod +x /mnt/inchroot.sh
+rm /mnt/etc/resolv.conf
+cp /etc/resolv.conf /mnt/etc/resolv.conf
+arch-chroot /mnt ./inchroot.sh || exit 1
+exit
+#inchroot
+#+END_SRC
+
+* Post Chroot
+** Locale
+#+begin_src bash
+printf '\033c'
+
+hostname=$(grep "^hostname" /installconfig | cut -d "=" -f2)
+username=$(grep "^username" /installconfig | cut -d "=" -f2)
+isvirt=$(grep "^isvirt" /installconfig | cut -d "=" -f2)
+userpass=$(grep "^userpass" /installconfig | cut -d "=" -f2)
+REPO=$(grep "^REPO" /installconfig | cut -d "=" -f2)
+xbps-install -S || exit 1
+
+mkdir -p /etc/xbps.d
+cp /usr/share/xbps.d/*-repository-*.conf /etc/xbps.d/
+echo "repository=$REPO" > /etc/xbps.d/00-repository-main.conf
+rm /installconfig
+ln -sf /usr/share/zoneinfo/Asia/Kolkata /etc/localtime
+hwclock --systohc
+echo $hostname > /etc/hostname
+echo "127.0.1.1       $hostname.localdomain $hostname" >> /etc/hosts
+
+xbps-install -S glibc-locales
+echo "en_US.UTF-8 UTF-8" >> /etc/default/libc-locales
+xbps-reconfigure -f glibc-locales
+echo "HARDWARECLOCK=\"UTC\"" >> /etc/rc.conf
+echo "KEYMAP=\"us\"" >> /etc/rc.conf
+#+end_src
+** GRUB
+#+begin_src bash
+xbps-install -y grub-x86_64-efi
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=VOID || exit 1
+grub-mkconfig -o /boot/grub/grub.cfg || exit 1
+printf '\033c'
+#+end_src
+** Sudo,doas and otherpackages
+#+begin_src bash
+xbps-install -y xorg noto-fonts-ttf noto-fonts-emoji noto-fonts-cjk \
+       font-awesome6 font-awesome5 xdotool sxiv fzf man-db \
+       xwallpaper git pipewire wireplumber NetworkManager \
+       pamixer fish-shell neovim vim opendoas \
+       lxdm stow kitty neofetch exa xz base-devel xtools aria2c tldr
+case $isvirt in
+    no|n|N) xbps-install -Sy  zathura zathura-pdf-mupdf unzip zip \
+               dosfstools ntfs-3g bluez bluez-alsa mpd mpv ncmpcpp mpc\
+               emacs-x11 flameshot ;;
+esac
+ln -s /etc/sv/dbus/ /etc/runit/runsvdir/current/
+ln -s /etc/sv/NetworkManager/ /etc/runit/runsvdir/current/
+ln -s /etc/sv/lxdm/ /etc/runit/runsvdir/current/
+
+echo "%wheel ALL=(ALL:ALL) ALL" >> /etc/sudoers
+echo "permit nopass :wheel as root" >> /etc/doas.conf
+useradd -mG wheel $username
+printf '%s\n%s\n' "$userpass" "$userpass" | passwd root;
+printf '%s\n%s\n' "$userpass" "$userpass" | passwd $username;
+xbps-reconfigure -fa
+
+#+end_src
+** Getting Ready For Dots
+#+begin_src bash
+dots_path=/home/$username/installdots
+sed '1,/^#dotssetup$/d' /inchroot.sh > $dots_path
+chown $username:$username $dots_path
+chmod +x $dots_path
+su -c $dots_path -s /bin/sh $username
+exit
+#dotssetup
+#+end_src
+** Installing Dots
+*** Building XMonad & XMobar from source
+#+begin_src bash
+printf '\033c'
+function installxmo {
+    doas xbps-install -y xorg-server-devel libXrandr-devel pango pango-devel libXpm libXpm-devel libmpd-devel alsa-lib-devel MesaLib-devel git ncurses-libtinfo-libs ncurses-libtinfo-devel\
+         libX11-devel libXft-devel libXinerama-devel  libXScrnSaver-devel pkg-config cabal-install
+    #cabal
+    cabal update
+    cabal install --lib xmonad
+    cabal install --lib xmonad-contrib
+    cabal install --lib X11
+    cabal install xmonad
+    cabal install xmobar -fall_extensions
+    doas printf "[Desktop Entry]\nEncoding=UTF-8\nName=xmonad\nComment=initializing xmonad...\nExec=$HOME/.cabal/bin/xmonad\nType=Application" > /usr/share/xsessions/xmonad.desktop
+    doas ln -s ~/.cabal/bin/xmonad /usr/bin
+    doas ln -s ~/.cabal/bin/xmobar /usr/bin
+    export PATH=$PATH:$HOME/.cabal/bin:$PATH
+    echo xmonad > ~/.xsession
+}
+installxmo
+
+#+end_src
+
+*** Cloning Repo
+#+begin_src bash
+printf '\033c'
+cd $HOME
+git clone https://github.com/Sigma-Coder777/dots.git ~/.dots
+cd .dots && stow */ --adopt
+#+end_src
+
+*** Fonts
+#+begin_src bash
+mkdir -p ~/.tmp/
+cd ~/.tmp
+aria2c "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.1/JetBrainsMono.zip"
+aria2c "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.1/Ubuntu.zip"
+unzip Ubuntu.zip
+rm readme.md
+unzip JetBrainsMono.zip
+doas mv *.ttf /usr/share/fonts/
+rm -rf ~/.tmp
+fc-cache
+#+end_src

@@ -8,7 +8,7 @@ echo "Welcome to archlinux bootstrap script"
 echo "Enter Your Name :-"
 read username
 echo "Enter Your User's Password :-"
-read userpass
+read -s userpass
 echo "Enter Hostname :-"
 read hostname
 echo "Is Virtual Machine ????"
