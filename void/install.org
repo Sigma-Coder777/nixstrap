@@ -132,7 +132,7 @@ xbps-install -y xorg noto-fonts-ttf noto-fonts-emoji noto-fonts-cjk \
        font-awesome6 font-awesome5 xdotool sxiv fzf man-db \
        xwallpaper git pipewire wireplumber NetworkManager \
        pamixer fish-shell neovim vim opendoas \
-       lxdm stow kitty neofetch exa xz base-devel xtools aria2c tldr
+       lxdm stow kitty neofetch exa xz base-devel xtools aria2 tldr
 case $isvirt in
     no|n|N) xbps-install -Sy  zathura zathura-pdf-mupdf unzip zip \
                dosfstools ntfs-3g bluez bluez-alsa mpd mpv ncmpcpp mpc\
@@ -150,6 +150,10 @@ printf '%s\n%s\n' "$userpass" "$userpass" | passwd $username;
 xbps-reconfigure -fa
 
 #+end_src
+
+#+RESULTS:
+: Changing password for nikhil.
+
 ** Getting Ready For Dots
 #+begin_src bash
 dots_path=/home/$username/installdots
@@ -162,25 +166,23 @@ exit
 #+end_src
 ** Installing Dots
 *** Building XMonad & XMobar from source
-#+begin_src bash
+#+begin_src example
 printf '\033c'
-function installxmo {
-    doas xbps-install -y xorg-server-devel libXrandr-devel pango pango-devel libXpm libXpm-devel libmpd-devel alsa-lib-devel MesaLib-devel git ncurses-libtinfo-libs ncurses-libtinfo-devel\
-         libX11-devel libXft-devel libXinerama-devel  libXScrnSaver-devel pkg-config cabal-install
-    #cabal
-    cabal update
-    cabal install --lib xmonad
-    cabal install --lib xmonad-contrib
-    cabal install --lib X11
-    cabal install xmonad
-    cabal install xmobar -fall_extensions
-    doas printf "[Desktop Entry]\nEncoding=UTF-8\nName=xmonad\nComment=initializing xmonad...\nExec=$HOME/.cabal/bin/xmonad\nType=Application" > /usr/share/xsessions/xmonad.desktop
-    doas ln -s ~/.cabal/bin/xmonad /usr/bin
-    doas ln -s ~/.cabal/bin/xmobar /usr/bin
-    export PATH=$PATH:$HOME/.cabal/bin:$PATH
-    echo xmonad > ~/.xsession
-}
-installxmo
+
+doas xbps-install -y xorg-server-devel libXrandr-devel pango pango-devel libXpm libXpm-devel libmpd-devel alsa-lib-devel MesaLib-devel git ncurses-libtinfo-libs ncurses-libtinfo-devel\
+     libX11-devel libXft-devel libXinerama-devel  libXScrnSaver-devel pkg-config cabal-install
+cabal update
+cabal install --lib xmonad
+cabal install --lib xmonad-contrib
+cabal install --lib X11
+cabal install xmonad
+cabal install xmobar -fall_extensions
+doas mkdir -p /usr/share/xsessions/
+doas printf "[Desktop Entry]\nEncoding=UTF-8\nName=xmonad\nComment=initializing xmonad...\nExec=$HOME/.cabal/bin/xmonad\nType=Application" > /usr/share/xsessions/xmonad.desktop
+doas ln -s ~/.cabal/bin/xmonad /usr/bin
+doas ln -s ~/.cabal/bin/xmobar /usr/bin
+export PATH=$PATH:$HOME/.cabal/bin:$PATH
+echo xmonad > ~/.xsession
 
 #+end_src
 
@@ -196,14 +198,15 @@ cd .dots && stow */ --adopt
 #+begin_src bash
 mkdir -p ~/.tmp/
 cd ~/.tmp
-aria2c "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.1/JetBrainsMono.zip"
-aria2c "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.1/Ubuntu.zip"
+wget "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.1/JetBrainsMono.zip"
+wget "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.1/Ubuntu.zip"
 unzip Ubuntu.zip
 rm readme.md
 unzip JetBrainsMono.zip
 doas mv *.ttf /usr/share/fonts/
 rm -rf ~/.tmp
 fc-cache
+cd $HOME
 #+end_src
 *** Suckless
 #+begin_src bash

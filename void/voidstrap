@@ -89,11 +89,11 @@ grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=VOID 
 grub-mkconfig -o /boot/grub/grub.cfg || exit 1
 printf '\033c'
 
-xbps-install -y xorg noto-fonts-ttf noto-fonts-emoji noto-fonts-cjk \
-       font-awesome6 font-awesome5 xdotool sxiv fzf man-db \
-       xwallpaper git pipewire wireplumber NetworkManager \
+#xbps-install -y xorg noto-fonts-ttf noto-fonts-emoji noto-fonts-cjk \
+       #font-awesome6 font-awesome5 xdotool sxiv fzf man-db \
+xbps-install xorg-minimal xwallpaper git pipewire wireplumber NetworkManager \
        pamixer fish-shell neovim vim opendoas \
-       lxdm stow kitty neofetch exa xz base-devel xtools aria2c tldr
+       lxdm stow kitty neofetch exa xz base-devel xtools aria2 tldr
 case $isvirt in
     no|n|N) xbps-install -Sy  zathura zathura-pdf-mupdf unzip zip \
                dosfstools ntfs-3g bluez bluez-alsa mpd mpv ncmpcpp mpc\
@@ -119,6 +119,7 @@ exit
 #dotssetup
 
 printf '\033c'
+
 function installxmo {
     doas xbps-install -y xorg-server-devel libXrandr-devel pango pango-devel libXpm libXpm-devel libmpd-devel alsa-lib-devel MesaLib-devel git ncurses-libtinfo-libs ncurses-libtinfo-devel\
          libX11-devel libXft-devel libXinerama-devel  libXScrnSaver-devel pkg-config cabal-install
@@ -129,13 +130,14 @@ function installxmo {
     cabal install --lib X11
     cabal install xmonad
     cabal install xmobar -fall_extensions
+    doas mkdir -p /usr/share/xsessions/
     doas printf "[Desktop Entry]\nEncoding=UTF-8\nName=xmonad\nComment=initializing xmonad...\nExec=$HOME/.cabal/bin/xmonad\nType=Application" > /usr/share/xsessions/xmonad.desktop
     doas ln -s ~/.cabal/bin/xmonad /usr/bin
     doas ln -s ~/.cabal/bin/xmobar /usr/bin
     export PATH=$PATH:$HOME/.cabal/bin:$PATH
     echo xmonad > ~/.xsession
 }
-installxmo
+#installxmo
 
 printf '\033c'
 cd $HOME
@@ -144,13 +146,14 @@ cd .dots && stow */ --adopt
 
 mkdir -p ~/.tmp/
 cd ~/.tmp
-aria2c "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.1/JetBrainsMono.zip"
-aria2c "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.1/Ubuntu.zip"
+wget "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.1/JetBrainsMono.zip"
+wget "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.1/Ubuntu.zip"
 unzip Ubuntu.zip
 rm readme.md
 unzip JetBrainsMono.zip
 doas mv *.ttf /usr/share/fonts/
 rm -rf ~/.tmp
 fc-cache
+cd $HOME
 
 cd ~/.local/src/dmenu && doas make clean install

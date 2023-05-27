@@ -94,7 +94,7 @@ chown $username:$username $dots_path
 chmod +x $dots_path
 su -c $dots_path -s /bin/sh $username
 exit
-#dotssetup$$
+#dotssetup
 
 printf '\033c'
 cd $HOME
