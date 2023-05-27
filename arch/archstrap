@@ -61,10 +61,12 @@ echo "127.0.0.1       localhost" >> /etc/hosts
 echo "::1             localhost" >> /etc/hosts
 echo "127.0.1.1       $hostname.localdomain $hostname" >> /etc/hosts
 
+printf '\033c'
 pacman --noconfirm -S grub efibootmgr os-prober
 grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB || exit 1
 grub-mkconfig -o /boot/grub/grub.cfg || exit 1
 
+printf '\033c'
 pacman -S --noconfirm xorg noto-fonts noto-fonts-emoji noto-fonts-cjk \
        ttf-jetbrains-mono ttf-jetbrains-mono-nerd ttf-ubuntu-nerd \
        ttf-font-awesome xdotool sxiv fzf man-db \
@@ -73,7 +75,7 @@ pacman -S --noconfirm xorg noto-fonts noto-fonts-emoji noto-fonts-cjk \
        lxdm stow xmonad xmonad-contrib \
        xmobar xmonad-extras kitty exa neofetch btop
 case $isvirt in
-    no) pacman -S --noconfirm zathura zathura-pdf-mupdf unzip zip \
+    no|n|N) pacman -S --noconfirm zathura zathura-pdf-mupdf unzip zip \
                dosfstools ntfs-3g bluez bluez-utils mpd mpv ncmpcpp mpc\
                emacs-nativecomp flameshot ;;
 esac
@@ -98,3 +100,4 @@ printf '\033c'
 cd $HOME
 git clone https://github.com/Sigma-Coder777/dots.git ~/.dots
 cd .dots && stow */ --adopt
+cd ~/.local/src/dmenu && doas make clean install

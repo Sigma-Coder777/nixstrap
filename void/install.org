@@ -15,8 +15,8 @@
   - [[#installing-dots][Installing Dots]]
 
 * About This Script
-This Script is created for automating the deployment of archlinux virtual machine or on physical hardware with all of my dotfiles setup
-NOTE:- This Script is for my use only
+This Script is created for automating the deployment of Voidlinux virtual machine or on physical hardware with all of my dotfiles setup
+NOTE:- This Script is for my use. Use only if you know what you are doing
 * Settings
 #+begin_src bash
 #!/usr/bin/bash
@@ -204,4 +204,8 @@ unzip JetBrainsMono.zip
 doas mv *.ttf /usr/share/fonts/
 rm -rf ~/.tmp
 fc-cache
+#+end_src
+*** Suckless
+#+begin_src bash
+cd ~/.local/src/dmenu && doas make clean install
 #+end_src

@@ -140,4 +140,5 @@ printf '\033c'
 cd $HOME
 git clone https://github.com/Sigma-Coder777/dots.git ~/.dots
 cd .dots && stow */ --adopt
+cd ~/.local/src/dmenu && doas make clean install
 #+end_src

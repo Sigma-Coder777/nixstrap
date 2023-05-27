@@ -152,3 +152,5 @@ unzip JetBrainsMono.zip
 doas mv *.ttf /usr/share/fonts/
 rm -rf ~/.tmp
 fc-cache
+
+cd ~/.local/src/dmenu && doas make clean install
