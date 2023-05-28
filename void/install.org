@@ -2,6 +2,7 @@
 #+PROPERTY: header-args :tangle voidstrap
 * Table of content :toc:
 - [[#about-this-script][About This Script]]
+- [[#problems-with-voidlinux][Problems with voidlinux]]
 - [[#settings][Settings]]
 - [[#partitioning][Partitioning]]
 - [[#install-xbps][Install XBPS]]
@@ -15,8 +16,16 @@
   - [[#installing-dots][Installing Dots]]
 
 * About This Script
+Void ISO are pretty outdated on their site and their default mirror is slow as hell in my region around 40 50 kbps
+This is why this script runs on arch-based iso
+but if you want to run it on voidlinux live iso replace arch-chroot with xchroot and update xbps and install wget tar xz
 This Script is created for automating the deployment of Voidlinux virtual machine or on physical hardware with all of my dotfiles setup
-NOTE:- This Script is for my use. Use only if you know what you are doing
+*NOTE:- This Script is for my use. Use only if you know what you are doing*
+* Problems with voidlinux
++ XMonad and XMobar in void repo is very outdated
++ XMonad is built using cabal but xmobar is installed using nixpkgs because compiling xmobar takes lot of time. Xmonad does'nt take much time to compile but xmobar :(
++ It takes around 10 GiB on hard disk on clean install campared to other minimal installs Because i am installing major things using other package managers like cabal and nix
++ I will update the script to use xbps when void repo updates the packages
 * Settings
 #+begin_src bash
 #!/usr/bin/bash
@@ -91,7 +100,6 @@ arch-chroot /mnt ./inchroot.sh || exit 1
 exit
 #inchroot
 #+END_SRC
-
 * Post Chroot
 ** Locale
 #+begin_src bash
@@ -128,15 +136,17 @@ printf '\033c'
 #+end_src
 ** Sudo,doas and otherpackages
 #+begin_src bash
-xbps-install -y xorg noto-fonts-ttf noto-fonts-emoji noto-fonts-cjk \
-       font-awesome6 font-awesome5 xdotool sxiv fzf man-db \
-       xwallpaper git pipewire wireplumber NetworkManager \
-       pamixer fish-shell neovim vim opendoas \
-       lxdm stow kitty neofetch exa xz base-devel xtools aria2 tldr
+deps_xorg="xorg xorg-server-devel libXrandr-devel"
+deps_fonts="noto-fonts-ttf noto-fonts-emoji noto-fonts-cjk font-awesome6 font-awesome5"
+deps_tools="unzip zip xdotool sxiv fzf man-db git exa xz base-devel xtools aria2 tldr bat neovim vim opendoas stow fish-shell wget"
+deps_services="lxdm pamixer pipewire wireplumber NetworkManager"
+deps_onhardware="emacs-x11 flameshot dosfstools ntfs-3g bluez bluez-alsa mpd mpv ncmpcpp mpc zathura zathura-pdf-mupdf"
+deps_xmorice="kitty neofetch xwallpaper"
+deps_qtilerice="alacritty polybar qtile rofi neofetch"
+
+xbps-install -y $deps_xorg $deps_tools $deps_services $deps_qtilerice $deps_fonts $deps_xmorice
 case $isvirt in
-    no|n|N) xbps-install -Sy  zathura zathura-pdf-mupdf unzip zip \
-               dosfstools ntfs-3g bluez bluez-alsa mpd mpv ncmpcpp mpc\
-               emacs-x11 flameshot ;;
+    no|n|N) xbps-install -Sy $dep_onhardware;;
 esac
 ln -s /etc/sv/dbus/ /etc/runit/runsvdir/current/
 ln -s /etc/sv/NetworkManager/ /etc/runit/runsvdir/current/
@@ -151,41 +161,43 @@ xbps-reconfigure -fa
 
 #+end_src
 
-#+RESULTS:
-: Changing password for nikhil.
 
 ** Getting Ready For Dots
 #+begin_src bash
+
+printf "[Desktop Entry]\nEncoding=UTF-8\nName=xmonad\nComment=initializing xmonad...\nExec=/home/$username/.cabal/bin/xmonad\nType=Application" > /usr/share/xsessions/xmonad.desktop
 dots_path=/home/$username/installdots
 sed '1,/^#dotssetup$/d' /inchroot.sh > $dots_path
 chown $username:$username $dots_path
 chmod +x $dots_path
-su -c $dots_path -s /bin/sh $username
+su -c $dots_path -s /bin/bash $username
 exit
 #dotssetup
 #+end_src
 ** Installing Dots
 *** Building XMonad & XMobar from source
-#+begin_src example
+#+begin_src bash
 printf '\033c'
 
-doas xbps-install -y xorg-server-devel libXrandr-devel pango pango-devel libXpm libXpm-devel libmpd-devel alsa-lib-devel MesaLib-devel git ncurses-libtinfo-libs ncurses-libtinfo-devel\
-     libX11-devel libXft-devel libXinerama-devel  libXScrnSaver-devel pkg-config cabal-install
-cabal update
-cabal install --lib xmonad
-cabal install --lib xmonad-contrib
-cabal install --lib X11
-cabal install xmonad
-cabal install xmobar -fall_extensions
-doas mkdir -p /usr/share/xsessions/
-doas printf "[Desktop Entry]\nEncoding=UTF-8\nName=xmonad\nComment=initializing xmonad...\nExec=$HOME/.cabal/bin/xmonad\nType=Application" > /usr/share/xsessions/xmonad.desktop
-doas ln -s ~/.cabal/bin/xmonad /usr/bin
-doas ln -s ~/.cabal/bin/xmobar /usr/bin
-export PATH=$PATH:$HOME/.cabal/bin:$PATH
-echo xmonad > ~/.xsession
+function installxmo {
+    deps_xmonad="git ncurses-libtinfo-libs ncurses-libtinfo-devel \
+         libX11-devel libXft-devel libXinerama-devel  libXScrnSaver-devel pkg-config cabal-install"
+    deps_xmobar="xorg-server-devel libXrandr-devel pango pango-devel libXpm libXpm-devel libmpd-devel alsa-lib-devel MesaLib-devel"
+    doas xbps-install -y $deps_xmonad
+    cabal update
+    cabal install --lib xmonad
+    cabal install --lib xmonad-contrib
+    cabal install --lib X11
+    cabal install xmonad
+    #cabal install xmobar -fall_extensions
+    doas ln -s ~/.cabal/bin/xmonad /usr/bin
+    #doas ln -s ~/.cabal/bin/xmobar /usr/bin
+    export PATH=$PATH:$HOME/.cabal/bin:$PATH
+    echo xmonad > ~/.xsession
+}
+installxmo
 
 #+end_src
-
 *** Cloning Repo
 #+begin_src bash
 printf '\033c'
@@ -208,7 +220,27 @@ rm -rf ~/.tmp
 fc-cache
 cd $HOME
 #+end_src
+
 *** Suckless
 #+begin_src bash
 cd ~/.local/src/dmenu && doas make clean install
 #+end_src
+*** Setting for nix script
+#+begin_src bash
+sed '1,^#nixsetup$/d' ~/installdots > ~/installnixandxmobar
+chmod +x ~/installnixandxmobar
+printf '\033c'
+echo "Run installnixandxmobar script after reboot"
+exit 0
+#+end_src
+*** Installing XMobar Using NixPkg
+#+BEGIN_SRC bash
+#nixsetup
+#!/bin/bash
+doas xbps-install -y nix
+doas ln -s /etc/sv/nix-daemon /var/service
+nix-channel --add http://nixos.org/channels/nixpkgs-unstable
+source /etc/profile
+nix-channel --update
+nix-env -iA nixpkgs.xmobar
+#+END_SRC

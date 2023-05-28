@@ -89,15 +89,17 @@ grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=VOID 
 grub-mkconfig -o /boot/grub/grub.cfg || exit 1
 printf '\033c'
 
-#xbps-install -y xorg noto-fonts-ttf noto-fonts-emoji noto-fonts-cjk \
-       #font-awesome6 font-awesome5 xdotool sxiv fzf man-db \
-xbps-install xorg-minimal xwallpaper git pipewire wireplumber NetworkManager \
-       pamixer fish-shell neovim vim opendoas \
-       lxdm stow kitty neofetch exa xz base-devel xtools aria2 tldr
+deps_xorg="xorg xorg-server-devel libXrandr-devel"
+deps_fonts="noto-fonts-ttf noto-fonts-emoji noto-fonts-cjk font-awesome6 font-awesome5"
+deps_tools="unzip zip xdotool sxiv fzf man-db git exa xz base-devel xtools aria2 tldr bat neovim vim opendoas stow fish-shell wget"
+deps_services="lxdm pamixer pipewire wireplumber NetworkManager"
+deps_onhardware="emacs-x11 flameshot dosfstools ntfs-3g bluez bluez-alsa mpd mpv ncmpcpp mpc zathura zathura-pdf-mupdf"
+deps_xmorice="kitty neofetch xwallpaper"
+deps_qtilerice="alacritty polybar qtile rofi neofetch"
+
+xbps-install -y $deps_xorg $deps_tools $deps_services $deps_qtilerice $deps_fonts $deps_xmorice
 case $isvirt in
-    no|n|N) xbps-install -Sy  zathura zathura-pdf-mupdf unzip zip \
-               dosfstools ntfs-3g bluez bluez-alsa mpd mpv ncmpcpp mpc\
-               emacs-x11 flameshot ;;
+    no|n|N) xbps-install -Sy $dep_onhardware;;
 esac
 ln -s /etc/sv/dbus/ /etc/runit/runsvdir/current/
 ln -s /etc/sv/NetworkManager/ /etc/runit/runsvdir/current/
@@ -110,34 +112,34 @@ printf '%s\n%s\n' "$userpass" "$userpass" | passwd root;
 printf '%s\n%s\n' "$userpass" "$userpass" | passwd $username;
 xbps-reconfigure -fa
 
+printf "[Desktop Entry]\nEncoding=UTF-8\nName=xmonad\nComment=initializing xmonad...\nExec=/home/$username/.cabal/bin/xmonad\nType=Application" > /usr/share/xsessions/xmonad.desktop
 dots_path=/home/$username/installdots
 sed '1,/^#dotssetup$/d' /inchroot.sh > $dots_path
 chown $username:$username $dots_path
 chmod +x $dots_path
-su -c $dots_path -s /bin/sh $username
+su -c $dots_path -s /bin/bash $username
 exit
 #dotssetup
 
 printf '\033c'
 
 function installxmo {
-    doas xbps-install -y xorg-server-devel libXrandr-devel pango pango-devel libXpm libXpm-devel libmpd-devel alsa-lib-devel MesaLib-devel git ncurses-libtinfo-libs ncurses-libtinfo-devel\
-         libX11-devel libXft-devel libXinerama-devel  libXScrnSaver-devel pkg-config cabal-install
-    #cabal
+    deps_xmonad="git ncurses-libtinfo-libs ncurses-libtinfo-devel \
+         libX11-devel libXft-devel libXinerama-devel  libXScrnSaver-devel pkg-config cabal-install"
+    deps_xmobar="xorg-server-devel libXrandr-devel pango pango-devel libXpm libXpm-devel libmpd-devel alsa-lib-devel MesaLib-devel"
+    doas xbps-install -y $deps_xmonad
     cabal update
     cabal install --lib xmonad
     cabal install --lib xmonad-contrib
     cabal install --lib X11
     cabal install xmonad
-    cabal install xmobar -fall_extensions
-    doas mkdir -p /usr/share/xsessions/
-    doas printf "[Desktop Entry]\nEncoding=UTF-8\nName=xmonad\nComment=initializing xmonad...\nExec=$HOME/.cabal/bin/xmonad\nType=Application" > /usr/share/xsessions/xmonad.desktop
+    #cabal install xmobar -fall_extensions
     doas ln -s ~/.cabal/bin/xmonad /usr/bin
-    doas ln -s ~/.cabal/bin/xmobar /usr/bin
+    #doas ln -s ~/.cabal/bin/xmobar /usr/bin
     export PATH=$PATH:$HOME/.cabal/bin:$PATH
     echo xmonad > ~/.xsession
 }
-#installxmo
+installxmo
 
 printf '\033c'
 cd $HOME
@@ -157,3 +159,18 @@ fc-cache
 cd $HOME
 
 cd ~/.local/src/dmenu && doas make clean install
+
+sed '1,^#nixsetup$/d' ~/installdots > ~/installnixandxmobar
+chmod +x ~/installnixandxmobar
+printf '\033c'
+echo "Run installnixandxmobar script after reboot"
+exit 0
+
+#nixsetup
+#!/bin/bash
+doas xbps-install -y nix
+doas ln -s /etc/sv/nix-daemon /var/service
+nix-channel --add http://nixos.org/channels/nixpkgs-unstable
+source /etc/profile
+nix-channel --update
+nix-env -iA nixpkgs.xmobar
