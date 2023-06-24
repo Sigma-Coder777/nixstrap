@@ -122,7 +122,7 @@ case isxbps in
     ,*) cp /var/db/xbps/keys/* /mnt/var/db/xbps/keys/ ||  cp /XBPS/var/db/xbps/keys/* /mnt/var/db/xbps/keys/ ;;
 esac
 cp /XBPS/var/db/xbps/keys/* /mnt/var/db/xbps/keys/
-XBPS_ARCH=$ARCH xbps-install -Sy -r /mnt -R "$REPO" base-system git linux grub-btrfs-runit grub-btrfs plymouth grub-x86_64-efi || exit 1
+XBPS_ARCH=$ARCH xbps-install -Sy -r /mnt -R "$REPO" base-system git linux grub-btrfs-runit grub-btrfs grub-x86_64-efi || exit 1
 command -v genfstab || wget https://raw.githubusercontent.com/glacion/genfstab/master/genfstab -O /usr/bin/genfstab && chmod +x /usr/bin/genfstab
 genfstab -U /mnt/ > /mnt/etc/fstab
 
