@@ -3,12 +3,8 @@
 I just wanted save some time setting up virtual machine by these scripts.
 This is highly inspired from Nixos & DTOS & Bugswriter's archlinux magic.
 *NOTE:- These are supposed to be used only by me, Use only if you know what you are doing*
-* How it is supposed to be used
-In theory you can install all distro in the repo from any distro
-as long as you have arch-install-scripts & dosfstools installed on your system
-But These are made to be run on arch linux (Based Distro / Vanilla)
 * Requirements
 Just run this command in your arch based distro live environment before running the install Script
 #+begin_src bash
-pacman -Sy doasfstools arch-install-scripts wget
+pacman -Sy doasfstools arch-install-scripts wget archlinux-keyring
 #+end_src

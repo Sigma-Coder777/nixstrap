@@ -1,9 +1,12 @@
 #+title: VoidLinux Bootstrap
 #+PROPERTY: header-args :tangle voidstrap
+#+auto_tangle: t
 * Table of content :toc:
 - [[#about-this-script][About This Script]]
-- [[#problems-with-voidlinux][Problems with voidlinux]]
-- [[#settings][Settings]]
+- [[#features][Features]]
+- [[#hardcoded-values][Hardcoded Values]]
+- [[#usage][Usage]]
+- [[#input][Input]]
 - [[#partitioning][Partitioning]]
 - [[#install-xbps][Install XBPS]]
 - [[#base-install][Base Install]]
@@ -11,58 +14,95 @@
 - [[#post-chroot][Post Chroot]]
   - [[#locale][Locale]]
   - [[#grub][GRUB]]
-  - [[#sudodoas-and-otherpackages][Sudo,doas and otherpackages]]
+  - [[#making-the-void][Making the Void]]
   - [[#getting-ready-for-dots][Getting Ready For Dots]]
   - [[#installing-dots][Installing Dots]]
+  - [[#cleanup][CleanUp]]
+- [[#][]]
 
 * About This Script
-Void ISO are pretty outdated on their site and their default mirror is slow as hell in my region around 40 50 kbps
-This is why this script runs on arch-based iso
-but if you want to run it on voidlinux live iso replace arch-chroot with xchroot and update xbps and install wget tar xz
+This script runs on any GNU/Linux based distro .
 This Script is created for automating the deployment of Voidlinux virtual machine or on physical hardware with all of my dotfiles setup
-*NOTE:- This Script is for my use. Use only if you know what you are doing*
-* Problems with voidlinux
-+ XMonad and XMobar in void repo is very outdated
-+ XMonad is built using cabal but xmobar is installed using nixpkgs because compiling xmobar takes lot of time. Xmonad does'nt take much time to compile but xmobar :(
-+ It takes around 10 GiB on hard disk on clean install campared to other minimal installs Because i am installing major things using other package managers like cabal and nix
-+ I will update the script to use xbps when void repo updates the packages
-* Settings
+You can call this script my linux distro based on void lol
+* Features
+It takes care of those things that should be done on each and every void setup but due to laziness or lack on knowledge they are not done those includes
+not setting up elogind and dbus properly was one of the reason my first impression of void was bad (as it was my first non systemd distro)
+- Apparmor
+- Sys Loggers
+- Firewall
+- Elogind / dbus
+- Pipewire Setup (due to recent changes many find it hard to setup)
+
+* Hardcoded Values
+Becuase somethings like my timezone and keyboard layout never change for me so i have hard coded theme so that i don't have to enter that again and again
+in case you are using this script change them
+list is here
+- Locale -> en_US.UTF-8
+- Video Drivers -> mesa
+- Timezone -> Asia/Kolkata
+- keymap -> us
+  
+* Usage
+This script allows to install voidlinux from any linux distro (in theory) just make sure you have wget, tar and xz installed on your system
+Just run the following commands as root I advice to use sudo su then run these instead using sudo that sometimes causes issues
+#+begin_example
+$ git clone https://github.com/Sigma-Coder777/nixstrap
+$ cd nixstrap/void/
+$ bash voidstrap
+#+end_example
+
+* Input
+In this part of script it asks the user about his name etc
 #+begin_src bash
 #!/usr/bin/bash
 if [ "$EUID" -ne 0 ]
-  then echo "Please run as root"
+  then echo "Please run script as root"
   exit 1
 fi
 
 echo "Welcome to Voidlinux bootstrap script"
-echo "Enter Your Name :-"
+echo "Enter username (eg -> naruto) :-"
 read username
+echo "Enter Full Name (eg -> Naruto Uzumaki) :-"
+read fullname
 echo "Enter Your User's Password :-"
 read -s userpass
-echo "Enter Hostname :-"
+echo "Enter Hostname (eg -> konoha) :-"
 read hostname
-echo "Is Virtual Machine ????"
-read isvirt
 #+end_src
 * Partitioning
+By default it create Btrfs & vfat formatted partitions
 #+begin_src bash
 lsblk
-echo "Select Your Drive"
+echo "Select Your Drive (eg -> /dev/sda):-"
 read drive
 cfdisk $drive
-echo "Enter Root Partition Name"
+echo "Enter Root Partition Name (eg -> /dev/sda2) :-"
 read rpart
-echo "Enter Boot Partition Name"
+echo "Enter Boot Partition Name (eg -> /dev/sda1) :-"
 read bpart
 
-mkfs.ext4 $rpart || exit 1
 mkfs.vfat -F32 $bpart || exit 1
+
+#btrfs
+mkfs.btrfs -f $rpart || exit 1
 mount $rpart /mnt
+btrfs subvolume create /mnt/@
+btrfs subvolume create /mnt/@home
+btrfs subvolume create /mnt/@snapshots
+
+umount /mnt
+mount -o noatime,ssd,space_cache=v2,compress=zstd,discard=async,subvol=@ $rpart /mnt
+mkdir -p /mnt/home
+mount -o noatime,ssd,space_cache=v2,compress=zstd,discard=async,subvol=@home $rpart /mnt/home/
+mkdir -p /mnt/.snapshots
+mount -o noatime,ssd,space_cache=v2,compress=zstd,discard=async,subvol=@snapshots $rpart /mnt/.snapshots
+
 mount --mkdir $bpart /mnt/boot/efi
 #+end_src
 * Install XBPS
+in case installing from another linux distro
 #+begin_src bash
-
 function installxbps {
  wget http://repo-default.voidlinux.org/static/xbps-static-latest.x86_64-musl.tar.xz
  mkdir /XBPS || exit 1
@@ -72,42 +112,47 @@ function installxbps {
 command -v xbps-install || installxbps && isxbps=n
 #+end_src
 * Base Install
+install base system 
 #+BEGIN_SRC bash
 REPO=https://mirrors.dotsrc.org/voidlinux/current
 ARCH=x86_64
 mkdir -p /mnt/var/db/xbps/keys
 case isxbps in
     n) cp /XBPS/var/db/xbps/keys/* /mnt/var/db/xbps/keys/ ;;
-    *) cp /var/db/xbps/keys/* /mnt/var/db/xbps/keys/ ||  cp /XBPS/var/db/xbps/keys/* /mnt/var/db/xbps/keys/ ;;
+    ,*) cp /var/db/xbps/keys/* /mnt/var/db/xbps/keys/ ||  cp /XBPS/var/db/xbps/keys/* /mnt/var/db/xbps/keys/ ;;
 esac
 cp /XBPS/var/db/xbps/keys/* /mnt/var/db/xbps/keys/
-XBPS_ARCH=$ARCH xbps-install -Sy -r /mnt -R "$REPO" base-system linux || exit 1
+XBPS_ARCH=$ARCH xbps-install -Sy -r /mnt -R "$REPO" base-system git linux grub-btrfs-runit grub-btrfs plymouth grub-x86_64-efi || exit 1
+command -v genfstab || wget https://raw.githubusercontent.com/glacion/genfstab/master/genfstab -O /usr/bin/genfstab && chmod +x /usr/bin/genfstab
 genfstab -U /mnt/ > /mnt/etc/fstab
 
 #+END_SRC
 * Getting Ready For Chroot
+Chrooting and copying the user data to target
 #+BEGIN_SRC bash
 echo "username=$username" >> /mnt/installconfig
+echo "fullname=$fullname" >> /mnt/installconfig
 echo "hostname=$hostname" >> /mnt/installconfig
-echo "isvirt=$isvirt" >> /mnt/installconfig
 echo "userpass=$userpass" >> /mnt/installconfig
 echo "REPO=$REPO" >> /mnt/installconfig
 sed '1,/^#inchroot$/d' `basename $0` > /mnt/inchroot.sh
 chmod +x /mnt/inchroot.sh
 rm /mnt/etc/resolv.conf
 cp /etc/resolv.conf /mnt/etc/resolv.conf
-arch-chroot /mnt ./inchroot.sh || exit 1
+for dir in dev proc sys run; do mount --rbind /$dir /mnt/$dir; mount --make-rslave /mnt/$dir; done
+chroot /mnt ./inchroot.sh || exit 1
 exit
 #inchroot
 #+END_SRC
 * Post Chroot
 ** Locale
+Locale Configurations
 #+begin_src bash
 printf '\033c'
 
 hostname=$(grep "^hostname" /installconfig | cut -d "=" -f2)
 username=$(grep "^username" /installconfig | cut -d "=" -f2)
-isvirt=$(grep "^isvirt" /installconfig | cut -d "=" -f2)
+fullname=$(grep "^fullname" /installconfig | cut -d "=" -f2)
 userpass=$(grep "^userpass" /installconfig | cut -d "=" -f2)
 REPO=$(grep "^REPO" /installconfig | cut -d "=" -f2)
 xbps-install -S || exit 1
@@ -128,44 +173,83 @@ echo "HARDWARECLOCK=\"UTC\"" >> /etc/rc.conf
 echo "KEYMAP=\"us\"" >> /etc/rc.conf
 #+end_src
 ** GRUB
+install grub and grub-btrfs
 #+begin_src bash
-xbps-install -y grub-x86_64-efi
-grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=VOID || exit 1
+echo "hostonly=yes" >> /etc/dracut.conf
+ln -s /etc/sv/grub-btrfs/ /etc/runit/runsvdir/current/
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=VoidLinux || exit 1
 grub-mkconfig -o /boot/grub/grub.cfg || exit 1
 printf '\033c'
 #+end_src
-** Sudo,doas and otherpackages
+** Making the Void
+*** Installing *Bloat*
 #+begin_src bash
-deps_xorg="xorg xorg-server-devel libXrandr-devel"
+deps_xorg="xorg-minimal xorg-input-drivers mesa mesa-dri xclip psmisc xprop xrandr libXrandr-devel libX11-devel libXinerama-devel libXft-devel"
 deps_fonts="noto-fonts-ttf noto-fonts-emoji noto-fonts-cjk font-awesome6 font-awesome5"
-deps_tools="unzip zip xdotool sxiv fzf man-db git exa xz base-devel xtools aria2 tldr bat neovim vim opendoas stow fish-shell wget"
-deps_services="lxdm pamixer pipewire wireplumber NetworkManager"
-deps_onhardware="emacs-x11 flameshot dosfstools ntfs-3g bluez bluez-alsa mpd mpv ncmpcpp mpc zathura zathura-pdf-mupdf"
-deps_xmorice="kitty neofetch xwallpaper"
-deps_qtilerice="alacritty polybar qtile rofi neofetch"
+deps_tools="unzip zip xdotool sxiv fzf man-db git exa xz base-devel xtools aria2 tldr bat"
+deps_tools_2="neovim opendoas stow fish-shell wget ranger bash-completion xdg-utils xdg-user-dirs xtools starship"
+deps_services="lxdm pamixer pipewire wireplumber-elogind alsa-utils NetworkManager dbus-elogind-x11 dbus-elogind-libs polkit-elogind elogind apparmor ufw ufw-extras socklog-void "  
+deps_onhardware="emacs-x11 flameshot dosfstools ntfs-3g bluez bluez-alsa mpd libspa-bluetooth intel-ucode mpv ncmpcpp mpc firefox blueman"
+deps_qtilerice="alacritty qtile python3-psutil neofetch xwallpaper"
+deps_gui="lxsession lxappearance kvantum qt5ct pcmanfm pavucontrol"
 
-xbps-install -y $deps_xorg $deps_tools $deps_services $deps_qtilerice $deps_fonts $deps_xmorice
-case $isvirt in
-    no|n|N) xbps-install -Sy $dep_onhardware;;
-esac
+xbps-install -Sy $deps_xorg $deps_tools_2 $deps_tools $deps_services $deps_qtilerice $deps_fonts $deps_gui || exit 1
+
+#+end_src
+*** Starting Services and apparmor
+#+begin_src bash
+echo "QT_QPA_PLATFORMTHEME=qt5ct" >> /etc/environment
+sed -i 's@APPARMOR=complain@APPARMOR=enforce@g' /etc/default/apparmor
+echo 'kernel_cmdline="apparmor=1 security=apparmor"' > /etc/dracut.conf.d/cmdline.conf
+
 ln -s /etc/sv/dbus/ /etc/runit/runsvdir/current/
 ln -s /etc/sv/NetworkManager/ /etc/runit/runsvdir/current/
 ln -s /etc/sv/lxdm/ /etc/runit/runsvdir/current/
+ln -s /etc/sv/polkitd/ /etc/runit/runsvdir/current/
+ln -s /etc/sv/socklog-unix/ /etc/runit/runsvdir/current/
+ln -s /etc/sv/nanoklogd/ /etc/runit/runsvdir/current/
+ln -s /etc/sv/ufw/ /etc/runit/runsvdir/current/
+ufw enable
 
+#+end_src
+*** Pipewire for audio
+#+begin_src bash
+# Pipewire
+ln -s /usr/share/applications/pipewire.desktop /etc/xdg/autostart/pipewire.desktop
+mkdir -p /etc/pipewire/pipewire.conf.d
+ln -s /usr/share/examples/wireplumber/10-wireplumber.conf /etc/pipewire/pipewire.conf.d/
+ln -s /usr/share/examples/pipewire/20-pipewire-pulse.conf /etc/pipewire/pipewire.conf.
+
+#+end_src
+*** Autologin and Xorg Conf
+#+begin_src bash
+sed -i "s|# autologin=dgod|autologin=$username|g" /etc/lxdm/lxdm.conf
+sed -i "s|# session=/usr/bin/startlxde|session=/bin/qtile start|g" /etc/lxdm/lxdm.conf
+echo "source ~/.bash_profile" >> /etc/lxdm/PostLogin
+
+mkdir -p /etc/X11/xorg.conf.d/
+cat << EOF >> /etc/X11/xorg.conf.d/30-touchpad.conf
+Section "InputClass"
+     Identifier "devname"
+     Driver "libinput"
+         Option "Tapping" "on"
+         Option "NaturalScrolling" "true"
+EndSection
+EOF
+#+end_src
+*** Creating Normie user
+#+begin_src bash
 echo "%wheel ALL=(ALL:ALL) ALL" >> /etc/sudoers
 echo "permit nopass :wheel as root" >> /etc/doas.conf
-useradd -mG wheel $username
+useradd -mG wheel,audio,video,network "$username" -c "$fullname"
 printf '%s\n%s\n' "$userpass" "$userpass" | passwd root;
 printf '%s\n%s\n' "$userpass" "$userpass" | passwd $username;
 xbps-reconfigure -fa
-
 #+end_src
 
 
 ** Getting Ready For Dots
 #+begin_src bash
-
-printf "[Desktop Entry]\nEncoding=UTF-8\nName=xmonad\nComment=initializing xmonad...\nExec=/home/$username/.cabal/bin/xmonad\nType=Application" > /usr/share/xsessions/xmonad.desktop
 dots_path=/home/$username/installdots
 sed '1,/^#dotssetup$/d' /inchroot.sh > $dots_path
 chown $username:$username $dots_path
@@ -175,35 +259,14 @@ exit
 #dotssetup
 #+end_src
 ** Installing Dots
-*** Building XMonad & XMobar from source
-#+begin_src bash
-printf '\033c'
-
-function installxmo {
-    deps_xmonad="git ncurses-libtinfo-libs ncurses-libtinfo-devel \
-         libX11-devel libXft-devel libXinerama-devel  libXScrnSaver-devel pkg-config cabal-install"
-    deps_xmobar="xorg-server-devel libXrandr-devel pango pango-devel libXpm libXpm-devel libmpd-devel alsa-lib-devel MesaLib-devel"
-    doas xbps-install -y $deps_xmonad
-    cabal update
-    cabal install --lib xmonad
-    cabal install --lib xmonad-contrib
-    cabal install --lib X11
-    cabal install xmonad
-    #cabal install xmobar -fall_extensions
-    doas ln -s ~/.cabal/bin/xmonad /usr/bin
-    #doas ln -s ~/.cabal/bin/xmobar /usr/bin
-    export PATH=$PATH:$HOME/.cabal/bin:$PATH
-    echo xmonad > ~/.xsession
-}
-installxmo
-
-#+end_src
 *** Cloning Repo
 #+begin_src bash
 printf '\033c'
 cd $HOME
 git clone https://github.com/Sigma-Coder777/dots.git ~/.dots
 cd .dots && stow */ --adopt
+xdg-user-dirs-update
+cp ~/.local/share/backgrounds/* ~/Pictures
 #+end_src
 
 *** Fonts
@@ -221,26 +284,36 @@ fc-cache
 cd $HOME
 #+end_src
 
+*** Gtk Theme
+Catppuccin Moch Pink Dark
+#+begin_src bash
+mkdir -p $HOME/.local/share/themes
+wget https://github.com/catppuccin/gtk/releases/download/v0.6.1/Catppuccin-Mocha-Standard-Pink-dark.zip -O $HOME/.local/share/themes/theme.zip
+cd $HOME/.local/share/themes
+unzip theme.zip
+rm *.zip
+#+end_src
+*** Icons & Kvantum
+Vimix Dark
+#+begin_src bash
+mkdir -p $HOME/.local/pkgs
+git clone --depth 1 https://github.com/catppuccin/Kvantum $HOME/.local/pkgs/kvantum
+git clone https://github.com/vinceliuice/vimix-icon-theme.git --depth 1 $HOME/.local/pkgs/icons
+$HOME/.local/pkgs/icons/install.sh
+#+end_src
 *** Suckless
 #+begin_src bash
 cd ~/.local/src/dmenu && doas make clean install
+cd ~/.dots/ && git checkout -f
 #+end_src
-*** Setting for nix script
+** CleanUp
 #+begin_src bash
-sed '1,^#nixsetup$/d' ~/installdots > ~/installnixandxmobar
-chmod +x ~/installnixandxmobar
-printf '\033c'
-echo "Run installnixandxmobar script after reboot"
-exit 0
+rm $HOME/installdots
+doas rm /inchroot.sh
 #+end_src
-*** Installing XMobar Using NixPkg
-#+BEGIN_SRC bash
-#nixsetup
-#!/bin/bash
-doas xbps-install -y nix
-doas ln -s /etc/sv/nix-daemon /var/service
-nix-channel --add http://nixos.org/channels/nixpkgs-unstable
-source /etc/profile
-nix-channel --update
-nix-env -iA nixpkgs.xmobar
-#+END_SRC
+
+* Todo 
+- [ ] Disk Encryption Support
+- [ ] A variant which just installs void and sets up apparmor ufw and elogind
+- [ ] Musl Variant (Maybe)
+- [ ] Calamares Version (chances are almost zero)
